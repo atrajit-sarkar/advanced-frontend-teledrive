@@ -23,9 +23,12 @@ const fileTypeIcons: Record<FileType, React.ElementType> = {
 interface FileCardProps {
   file: MediaFile;
   viewMode: 'grid' | 'list';
+  onDownload?: (file: MediaFile) => void;
+  onRename?: (file: MediaFile) => void;
+  onDelete?: (file: MediaFile) => void;
 }
 
-export default function FileCard({ file, viewMode }: FileCardProps) {
+export default function FileCard({ file, viewMode, onDownload, onRename, onDelete }: FileCardProps) {
   const FileIcon = fileTypeIcons[file.type];
   const placeholderImage = file.type === 'image' ? PlaceHolderImages.find(p => p.id === file.id) : null;
 
@@ -74,9 +77,9 @@ export default function FileCard({ file, viewMode }: FileCardProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Download</DropdownMenuItem>
-            <DropdownMenuItem>Rename</DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDownload?.(file)}>Download</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onRename?.(file)}>Rename</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDelete?.(file)} className="text-destructive">Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -125,9 +128,9 @@ export default function FileCard({ file, viewMode }: FileCardProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Download</DropdownMenuItem>
-              <DropdownMenuItem>Rename</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload?.(file)}>Download</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onRename?.(file)}>Rename</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDelete?.(file)} className="text-destructive">Delete</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

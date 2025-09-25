@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Bot, Phone, KeyRound } from 'lucide-react';
+import { ArrowRight, Bot, Phone, KeyRound, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,34 +12,60 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 export default function LoginPage() {
-  const [step, setStep] = useState<'phone' | 'code'>('phone');
+  const [step, setStep] = useState<'phone' | 'code' | 'password'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handlePhoneSubmit = (e: React.FormEvent) => {
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (phoneNumber.trim()) {
-      setIsLoading(true);
-      // Simulate API call to send code
-      setTimeout(() => {
-        setIsLoading(false);
-        setStep('code');
-      }, 1500);
-    }
+    if (!phoneNumber.trim()) return;
+    setIsLoading(true); setError(null);
+    try {
+      const { sendCode } = await import('@/lib/backend');
+      await sendCode(phoneNumber.trim());
+      setStep('code');
+    } catch (err:any) {
+      setError(err.message || 'Failed to send code');
+    } finally { setIsLoading(false); }
   };
 
-  const handleCodeSubmit = (e: React.FormEvent) => {
+  const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.trim()) {
-      setIsLoading(true);
-      // Simulate API call to verify code
-      setTimeout(() => {
-        setIsLoading(false);
-        router.push('/dashboard');
-      }, 1500);
-    }
+    if (!code.trim()) return;
+    setIsLoading(true); setError(null);
+    try {
+      const { checkCode, fetchMe } = await import('@/lib/backend');
+      const status = await checkCode(code.trim());
+      if (status === 'authorized') {
+        const me = await fetchMe();
+        if (me.authorized) router.push('/dashboard'); else setError('Not authorized');
+      } else if (status === 'password_required') {
+        setStep('password');
+      } else {
+        setError('Unknown status');
+      }
+    } catch (err:any) {
+      setError(err.message || 'Verification failed');
+    } finally { setIsLoading(false); }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password.trim()) return;
+    setIsLoading(true); setError(null);
+    try {
+      const { checkPassword, fetchMe } = await import('@/lib/backend');
+      const ok = await checkPassword(password.trim());
+      if (ok) {
+        const me = await fetchMe();
+        if (me.authorized) router.push('/dashboard'); else setError('Not authorized');
+      } else setError('Password incorrect');
+    } catch (err:any) { setError(err.message || 'Password check failed'); }
+    finally { setIsLoading(false); }
   };
 
   return (
@@ -53,6 +79,12 @@ export default function LoginPage() {
           <CardDescription>Your personal cloud, powered by Telegram.</CardDescription>
         </CardHeader>
         <CardContent className="p-8">
+          {error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           {step === 'phone' && (
             <form onSubmit={handlePhoneSubmit} className="space-y-6">
               <div className="space-y-2">
@@ -73,6 +105,7 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full h-12 text-lg" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                 {isLoading ? 'Sending Code...' : 'Send Code'}
                 {!isLoading && <ArrowRight className="ml-2 h-5 w-5" />}
               </Button>
@@ -101,11 +134,42 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full h-12 text-lg" disabled={isLoading}>
-                {isLoading ? 'Verifying...' : 'Log In'}
+                {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                {isLoading ? 'Verifying...' : 'Verify Code'}
                 {!isLoading && <ArrowRight className="ml-2 h-5 w-5" />}
               </Button>
               <Button variant="link" onClick={() => setStep('phone')} className="w-full">
                 Back to phone number
+              </Button>
+            </form>
+          )}
+
+          {step === 'password' && (
+            <form onSubmit={handlePasswordSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">Two Factor Password</h3>
+                <p className="text-sm text-muted-foreground">Enter your Telegram cloud password.</p>
+              </div>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="pl-10 h-12 text-lg"
+                  disabled={isLoading}
+                />
+              </div>
+              <Button type="submit" className="w-full h-12 text-lg" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                {isLoading ? 'Verifying...' : 'Log In'}
+                {!isLoading && <ArrowRight className="ml-2 h-5 w-5" />}
+              </Button>
+              <Button variant="link" onClick={() => setStep('code')} className="w-full">
+                Back to code
               </Button>
             </form>
           )}

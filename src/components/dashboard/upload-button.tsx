@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { Upload, Loader2, FileUp, Sparkles, AlertCircle } from 'lucide-react';
 import type { MediaFile } from '@/lib/definitions';
+import { uploadFile, fetchDrive, buildDownloadUrl } from '@/lib/backend';
 import { generateTags } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -76,31 +77,35 @@ export function UploadButton({ onUploadSuccess }: UploadButtonProps) {
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!file) return;
-    
-    // Simulate upload
-    setIsLoading(true);
-    setTimeout(() => {
+    setIsLoading(true); setError(null);
+    try {
+      await uploadFile(file, null); // root folder
+      // Refresh drive to build new file object(s)
+      const nodes = await fetchDrive(null);
+      const latest = nodes.filter(n=>n.type==='file').sort((a,b)=>b.id - a.id)[0];
+      if (latest) {
+        const name = latest.name;
+        const isImg = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
         const newFile: MediaFile = {
-            id: `new-${Date.now()}`,
-            name: file.name,
-            type: file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document',
+          id: String(latest.id),
+          name,
+            type: isImg ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document',
             size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
             dateAdded: new Date().toISOString(),
             tags: tags,
-            url: preview || '#',
+            url: isImg && latest.message_id ? buildDownloadUrl(latest.message_id, true) : '#',
+            messageId: latest.message_id,
+            folderId: latest.parent_id ?? null,
         };
-
         onUploadSuccess(newFile);
-        setIsLoading(false);
-        resetState();
-        toast({
-            title: "Upload Successful!",
-            description: `${file.name} has been added to your drive.`,
-        });
-    }, 1500);
-
+      }
+      toast({ title: 'Upload Successful!', description: `${file.name} has been added to your drive.` });
+      resetState();
+    } catch (err:any) {
+      setError(err.message || 'Upload failed');
+    } finally { setIsLoading(false); }
   };
 
   const resetState = () => {

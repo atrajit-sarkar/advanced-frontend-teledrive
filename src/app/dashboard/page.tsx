@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -18,7 +18,10 @@ import {
 } from 'lucide-react';
 
 import type { MediaFile, FileType } from '@/lib/definitions';
-import { mockFiles } from '@/lib/mock-data';
+// import { mockFiles } from '@/lib/mock-data';
+import { fetchDrive, buildDownloadUrl, renameFile, deleteFiles } from '@/lib/backend';
+import { useAuth } from '@/context/auth-context';
+import { getSessionId } from '@/lib/backend';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -67,7 +70,8 @@ const fileTypeIcons: Record<FileType, React.ElementType> = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [files, setFiles] = useState<MediaFile[]>(mockFiles);
+  const { me, loading, refresh } = useAuth();
+  const [files, setFiles] = useState<MediaFile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<FileType | 'all'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -84,6 +88,59 @@ export default function DashboardPage() {
 
   const handleAddFile = (newFile: MediaFile) => {
     setFiles((prevFiles) => [newFile, ...prevFiles]);
+  };
+
+  // Fetch drive data when auth ready
+  // Drive fetch effect
+  useEffect(() => {
+    if (loading) return; // still determining auth
+    const sid = getSessionId();
+    // If no session id at all, truly unauthenticated -> redirect
+    if (!sid && !me) { router.replace('/'); return; }
+    // If we have a session id but me is still null, attempt a refresh (avoid redirect loop)
+    if (sid && !me) { refresh(); return; }
+    if (!me) return; // wait until me populated
+    (async () => {
+      try {
+        const nodes = await fetchDrive(null);
+        const mapped: MediaFile[] = nodes.filter(n => n.type === 'file').map(n => {
+          const name = n.name;
+          const isImg = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+          return {
+            id: String(n.id),
+            name,
+            type: isImg ? 'image' : 'document',
+            size: '—',
+            dateAdded: new Date().toISOString(),
+            tags: [],
+            url: n.message_id && isImg ? buildDownloadUrl(n.message_id, true) : '#',
+            messageId: n.message_id,
+            folderId: n.parent_id ?? null,
+          };
+        });
+        setFiles(mapped);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [me, loading, refresh]);
+
+  const handleDownload = (file: MediaFile) => {
+    if (file.messageId) {
+      const url = buildDownloadUrl(file.messageId, false);
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleRename = async (file: MediaFile) => {
+    const name = prompt('Rename file', file.name);
+    if (!name || name === file.name) return;
+    try { await renameFile(Number(file.id), name); setFiles(fs => fs.map(f=>f.id===file.id?{...f,name}:f)); } catch (e:any) { alert(e.message); }
+  };
+
+  const handleDelete = async (file: MediaFile) => {
+    if (!confirm(`Delete ${file.name}?`)) return;
+    try { await deleteFiles([Number(file.id)]); setFiles(fs => fs.filter(f=>f.id!==file.id)); } catch (e:any) { alert(e.message); }
   };
 
   return (
@@ -254,7 +311,7 @@ export default function DashboardPage() {
               )}
             >
               {filteredFiles.map((file) => (
-                <FileCard key={file.id} file={file} viewMode={viewMode} />
+                <FileCard key={file.id} file={file} viewMode={viewMode} onDownload={handleDownload} onRename={handleRename} onDelete={handleDelete} />
               ))}
             </div>
           ) : (
