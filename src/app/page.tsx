@@ -121,15 +121,17 @@ export default function LoginPage() {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle className="font-headline">Telegram Bot API Setup</AlertDialogTitle>
-                <AlertDialogDescription className="space-y-2">
-                  <p>To make TeleDrive fully functional, you need to set up a Telegram Bot and obtain API credentials.</p>
-                  <ol className="list-decimal list-inside text-sm text-left space-y-1">
-                    <li>Talk to <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-primary underline">@BotFather</a> on Telegram to create a new bot.</li>
-                    <li>You will receive an API token. Store it securely.</li>
-                    <li>This token will be used in your application's backend to interact with the Telegram API for uploading and fetching files.</li>
-                    <li>The authentication flow will also use this API to send login codes.</li>
-                  </ol>
-                  <p className="font-semibold">This is a mock interface. The actual backend logic needs to be implemented by you.</p>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2">
+                    <div>To make TeleDrive fully functional, you need to set up a Telegram Bot and obtain API credentials.</div>
+                    <ol className="list-decimal list-inside text-sm text-left space-y-1">
+                      <li>Talk to <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-primary underline">@BotFather</a> on Telegram to create a new bot.</li>
+                      <li>You will receive an API token. Store it securely.</li>
+                      <li>This token will be used in your application's backend to interact with the Telegram API for uploading and fetching files.</li>
+                      <li>The authentication flow will also use this API to send login codes.</li>
+                    </ol>
+                    <div className="font-semibold">This is a mock interface. The actual backend logic needs to be implemented by you.</div>
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
