@@ -26,17 +26,22 @@ interface FileCardProps {
   onDownload?: (file: MediaFile) => void;
   onRename?: (file: MediaFile) => void;
   onDelete?: (file: MediaFile) => void;
+  onPreview?: (file: MediaFile) => void;
 }
 
-export default function FileCard({ file, viewMode, onDownload, onRename, onDelete }: FileCardProps) {
+export default function FileCard({ file, viewMode, onDownload, onRename, onDelete, onPreview }: FileCardProps) {
   const FileIcon = fileTypeIcons[file.type];
   const placeholderImage = file.type === 'image' ? PlaceHolderImages.find(p => p.id === file.id) : null;
+  const hasRealImage = file.type === 'image' && file.url && file.url !== '#';
 
   if (viewMode === 'list') {
     return (
       <div className="group flex w-full items-center gap-4 rounded-lg border p-2 transition-colors hover:bg-muted/50">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-muted">
-          {placeholderImage ? (
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-muted overflow-hidden cursor-pointer" onClick={()=> onPreview?.(file)}>
+          {hasRealImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={file.url} alt={file.name} className="h-full w-full object-cover" />
+          ) : placeholderImage ? (
             <Image
               src={placeholderImage.imageUrl}
               alt={file.name}
@@ -89,8 +94,15 @@ export default function FileCard({ file, viewMode, onDownload, onRename, onDelet
   return (
     <Card className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
       <CardHeader className="p-0">
-        <div className="relative aspect-video bg-muted">
-          {placeholderImage ? (
+        <div className="relative aspect-video bg-muted cursor-pointer overflow-hidden" onClick={()=> onPreview?.(file)}>
+          {hasRealImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={file.url}
+              alt={file.name}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : placeholderImage ? (
             <Image
               src={placeholderImage.imageUrl}
               alt={file.name}

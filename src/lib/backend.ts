@@ -87,6 +87,35 @@ export async function fetchDrive(parentId: number | null = null): Promise<DriveN
   return data.nodes || [];
 }
 
+// Folder + bulk operations
+export interface Folder { id: number; name: string; parent_id: number | null; }
+
+export async function createFolder(name: string, parentId: number | null) : Promise<Folder> {
+  const body = { name, parent_id: parentId } as any;
+  const data = await request('/folders', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  return data as Folder;
+}
+
+export async function renameFolder(id: number, name: string) {
+  await request('/folders/rename', { method: 'PATCH', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ id, name }) });
+}
+
+export interface BreadcrumbItem { id: number; name: string; parent_id: number | null; }
+export async function fetchBreadcrumbs(folderId: number | null): Promise<BreadcrumbItem[]> {
+  const q = folderId ? `?folder_id=${folderId}` : '';
+  const data = await request(`/folders/breadcrumbs${q}`);
+  return data.items || [];
+}
+
+export async function moveItems(fileIds: number[], folderIds: number[], targetParentId: number | null) {
+  await request('/move', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ file_ids: fileIds, folder_ids: folderIds, target_parent_id: targetParentId }) });
+}
+
+export async function bulkDelete(fileIds: number[], folderIds: number[]) {
+  if (!fileIds.length && !folderIds.length) return;
+  await request('/delete', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ file_ids: fileIds, folder_ids: folderIds }) });
+}
+
 export async function renameFile(id: number, name: string) {
   await request('/files/rename', { method: 'PATCH', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ id, name }) });
 }

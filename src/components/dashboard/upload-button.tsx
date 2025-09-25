@@ -27,8 +27,8 @@ interface UploadButtonProps {
 
 export function UploadButton({ onUploadSuccess }: UploadButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [preview, setPreview] = useState<string | null>(null); // preview of first image only
   const [tags, setTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,27 +37,21 @@ export function UploadButton({ onUploadSuccess }: UploadButtonProps) {
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
+    const list = Array.from(e.target.files || []);
+    if (list.length) {
+      setFiles(list);
       setError(null);
       setTags([]);
-
-      if (selectedFile.type.startsWith('image/')) {
+      const first = list[0];
+      if (first.type.startsWith('image/')) {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          setPreview(reader.result as string);
-          handleGenerateTags(reader.result as string, selectedFile.type);
-        };
-        reader.readAsDataURL(selectedFile);
+        reader.onloadend = () => { setPreview(reader.result as string); handleGenerateTags(reader.result as string, first.type); };
+        reader.readAsDataURL(first);
       } else {
         setPreview(null);
-        // For non-image files, we might not get a visual preview, but we can still generate tags if we can convert it to base64.
         const reader = new FileReader();
-        reader.onloadend = () => {
-          handleGenerateTags(reader.result as string, selectedFile.type);
-        };
-        reader.readAsDataURL(selectedFile);
+        reader.onloadend = () => { handleGenerateTags(reader.result as string, first.type); };
+        reader.readAsDataURL(first);
       }
     }
   };
@@ -78,38 +72,38 @@ export function UploadButton({ onUploadSuccess }: UploadButtonProps) {
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!files.length) return;
     setIsLoading(true); setError(null);
     try {
-      await uploadFile(file, null); // root folder
-      // Refresh drive to build new file object(s)
-      const nodes = await fetchDrive(null);
-      const latest = nodes.filter(n=>n.type==='file').sort((a,b)=>b.id - a.id)[0];
-      if (latest) {
-        const name = latest.name;
-        const isImg = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
-        const newFile: MediaFile = {
-          id: String(latest.id),
-          name,
-            type: isImg ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document',
-            size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+      for (const f of files) {
+        await uploadFile(f, null);
+        const nodes = await fetchDrive(null);
+        const latest = nodes.filter(n=>n.type==='file').sort((a,b)=>b.id - a.id)[0];
+        if (latest) {
+          const name = latest.name;
+          const isImg = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+          const newFile: MediaFile = {
+            id: String(latest.id),
+            name,
+            type: isImg ? 'image' : f.type.startsWith('video') ? 'video' : f.type.startsWith('audio') ? 'audio' : 'document',
+            size: `${(f.size / 1024 / 1024).toFixed(2)} MB`,
             dateAdded: new Date().toISOString(),
             tags: tags,
             url: isImg && latest.message_id ? buildDownloadUrl(latest.message_id, true) : '#',
             messageId: latest.message_id,
             folderId: latest.parent_id ?? null,
-        };
-        onUploadSuccess(newFile);
+          };
+          onUploadSuccess(newFile);
+        }
       }
-      toast({ title: 'Upload Successful!', description: `${file.name} has been added to your drive.` });
+      toast({ title: 'Upload Complete', description: `${files.length} file(s) uploaded.` });
       resetState();
-    } catch (err:any) {
-      setError(err.message || 'Upload failed');
-    } finally { setIsLoading(false); }
+    } catch (err:any) { setError(err.message || 'Upload failed'); }
+    finally { setIsLoading(false); }
   };
 
   const resetState = () => {
-    setFile(null);
+  setFiles([]);
     setPreview(null);
     setTags([]);
     setIsLoading(false);
@@ -143,11 +137,11 @@ export function UploadButton({ onUploadSuccess }: UploadButtonProps) {
           >
             {preview ? (
               <Image src={preview} alt="File preview" width={192} height={192} className="h-full w-auto object-contain rounded-md" />
-            ) : file ? (
+            ) : files.length ? (
               <div className="text-center">
                 <FileUp className="mx-auto h-12 w-12 text-primary" />
-                <p className="mt-2 font-semibold">{file.name}</p>
-                <p className="text-xs text-muted-foreground">{file.type}</p>
+                <p className="mt-2 font-semibold">{files.length} file(s) selected</p>
+                <p className="text-xs text-muted-foreground truncate max-w-[200px]">{files[0].name}</p>
               </div>
             ) : (
                <div className="text-center">
@@ -160,10 +154,11 @@ export function UploadButton({ onUploadSuccess }: UploadButtonProps) {
               type="file"
               className="hidden"
               onChange={handleFileChange}
+              multiple
               disabled={isLoading}
             />
           </div>
-          {file && (
+          {files.length > 0 && (
             <div>
               <h4 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-500"/> AI Suggested Tags</h4>
               <div className="mt-2 flex min-h-[40px] flex-wrap items-center gap-2">
@@ -183,9 +178,9 @@ export function UploadButton({ onUploadSuccess }: UploadButtonProps) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={resetState}>Cancel</Button>
-          <Button onClick={handleUpload} disabled={!file || isLoading}>
+          <Button onClick={handleUpload} disabled={!files.length || isLoading}>
             {isLoading && preview ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-            {isLoading && preview ? 'Uploading...' : 'Upload File'}
+            {isLoading && preview ? 'Uploading...' : 'Upload'}
           </Button>
         </DialogFooter>
       </DialogContent>
